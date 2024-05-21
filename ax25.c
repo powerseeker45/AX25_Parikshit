@@ -1,5 +1,6 @@
 #include "ax25.h"
 
+
 /**
  * Creates the address field of the AX.25 frame
  * @param out the output buffer with enough memory to hold the address field
@@ -44,6 +45,23 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
     *out++ = ((0x0F & dest_ssid) << 1) | 0x61;
     //*out++ = ((0b1111 & dest_ssid) << 1) | 0b01100001;
     return (size_t)AX25_MIN_ADDR_LEN;
+}
+
+
+/**
+ * Calculates the FCS of the AX25 frame
+ * @param buffer data buffer
+ * @param len size of the buffer
+ * @return the FCS of the buffer
+ */
+uint16_t ax25_fcs(uint8_t *buffer, size_t len)
+{
+  uint16_t fcs = 0xFFFF;
+  while (len--)
+  {
+    fcs = (fcs >> 8) ^ crc16_ccitt_table_reverse[(fcs ^ *buffer++) & 0xFF];
+  }
+  return fcs ^ 0xFFFF;
 }
 
 /**

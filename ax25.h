@@ -5,8 +5,10 @@
 #include <limits.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdlib.h>
 
-//#include "utils.h"
+
+#include "utils.h"
 //#include "config.h"
 
 /**
@@ -66,6 +68,8 @@ static const uint8_t AX25_CTRL_UI= 0x03;
 */
 
 size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t dest_ssid,const uint8_t *src_addr, uint8_t src_ssid);
+
+uint16_t ax25_fcs(uint8_t *buffer, size_t len);
 
 size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax25_frame_type_t type, uint8_t *addr, size_t addr_len, uint16_t ctrl, size_t ctrl_len);
 
