@@ -159,10 +159,16 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen,ax25_frame_typ
 
     uint8_t interm_buffer[AX25_MAX_FRAME_LEN]={0};
     uint32_t framelen=0;
-    framelen= ax25_create_frame(interm_buffer,in,inlen,type,addr,addrlen,ctrl,ctrllen);
+
+    /*immidiate_shash_update: add as to make multiple, use interm buffer */
+    framelen= ax25_create_frame(out,in,inlen,type,addr,addrlen,ctrl,ctrllen);
+
+
 
     return framelen;
     
 
     
 }
+
+

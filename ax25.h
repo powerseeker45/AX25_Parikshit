@@ -1,7 +1,7 @@
 #ifndef AX25_H /* AX25_H */
 #define AX25_H 
 
-#include <stdint.h>
+//#include <stdint.h> /* included in CONFIG_H */
 #include <limits.h>
 #include <stddef.h>
 #include <string.h>
@@ -9,7 +9,7 @@
 
 
 #include "utils.h"
-//#include "config.h"
+#include "config.h"
 
 /**
  * AX.25 related lengths
@@ -29,19 +29,6 @@
 
 /* AX.25 flag */
 #define AX25_FLAG 0x7E
-
-/**
- * dest and sender address related details
- * FUTURE_SHASH_PROBLEMS : 1. callsign change
- *                         2. ssid is set to 0 need for change?
-*/
-
-static const char SAT_CALLSIGN[] = "PARSAT";
-static const uint8_t SAT_SSID = 0;
-
-static const char GRD_CALLSIGN[] = "ABCD";
-static const uint8_t GRD_SSID = 0;
-
 
 /**
  * AX.25 Frame types
