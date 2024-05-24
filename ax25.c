@@ -223,11 +223,30 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
 
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
     framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
+
+    for(int i=0;i<framelen;i++)
+    {
+        printf("\n %x : %c : %d",interm_buffer[i],interm_buffer[i],interm_buffer[i]);
+    }
+
     status = ax25_bit_stuffing(tmp_send_buf, &ret_len, interm_buffer, framelen);
     if (status != AX25_ENC_OK)
     {
         return -1;
     }
 
-    return framelen;
+    memset(out, 0, ret_len / 8 * sizeof(uint8_t));
+  /* Pack now the bits into full bytes */
+  for (int i = 0; i < ret_len; i++)
+  {
+    out[i / 8] |= tmp_send_buf[i] << (7 - (i % 8));
+  }
+  pad_bits = 8 - (ret_len % 8);
+  ret_len += pad_bits;
+  out[ret_len / 8] &= (0xFF << pad_bits);
+
+
+  return ret_len / 8;
+
+    
 }
