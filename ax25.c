@@ -1,5 +1,7 @@
 #include "ax25.h"
 
+const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1,1, 1, 1, 1, 0}; 
+
 /**
  * Creates the address field of the AX.25 frame
  * @param out the output buffer with enough memory to hold the address field
