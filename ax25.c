@@ -1,5 +1,5 @@
 #include "ax25.h"
-
+#include <stdio.h>
 const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1,1, 1, 1, 1, 0}; 
 
 /**

@@ -13,7 +13,7 @@ int main()
         printf("error");
     for(int i=0;i<len;i++)
     {
-        printf(" %x",frame[i],frame[i]);
+        printf("\n %x : %c : %d",frame[i],frame[i],frame[i]);
     }
     
     
