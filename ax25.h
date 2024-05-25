@@ -58,6 +58,11 @@ typedef enum
 } ax25_encode_status_t;
 
 
+typedef enum
+{
+  AX25_DEC_FAIL, AX25_DEC_OK
+} ax25_decode_status_t;
+
 /**
  * function definitions
 */
@@ -70,6 +75,10 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
 
 int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen,ax25_frame_type_t type);
 
+
+uint32_t ax25_recv(uint8_t *out, const uint8_t *in, size_t len);
+
+ax25_decode_status_t ax25_decode (uint8_t *out, size_t *out_len, const uint8_t *ax25_frame,size_t len);
 
 
 
