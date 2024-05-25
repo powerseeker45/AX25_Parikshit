@@ -1,5 +1,6 @@
 #include "ax25.h"
-
+#include <stdio.h>
+const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1,1, 1, 1, 1, 0}; 
 
 /**
  * Creates the address field of the AX.25 frame
@@ -9,7 +10,7 @@
  * @param src_addr the callsign of the source
  * @param src_ssid the source SSID
  */
-size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t dest_ssid,const uint8_t *src_addr, uint8_t src_ssid)
+size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t dest_ssid, const uint8_t *src_addr, uint8_t src_ssid)
 {
     uint16_t i = 0;
 
@@ -47,7 +48,6 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
     return (size_t)AX25_MIN_ADDR_LEN;
 }
 
-
 /**
  * Calculates the FCS of the AX25 frame
  * @param buffer data buffer
@@ -56,12 +56,12 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
  */
 uint16_t ax25_fcs(uint8_t *buffer, size_t len)
 {
-  uint16_t fcs = 0xFFFF;
-  while (len--)
-  {
-    fcs = (fcs >> 8) ^ crc16_ccitt_table_reverse[(fcs ^ *buffer++) & 0xFF];
-  }
-  return fcs ^ 0xFFFF;
+    uint16_t fcs = 0xFFFF;
+    while (len--)
+    {
+        fcs = (fcs >> 8) ^ crc16_ccitt_table_reverse[(fcs ^ *buffer++) & 0xFF];
+    }
+    return fcs ^ 0xFFFF;
 }
 
 /**
@@ -110,7 +110,7 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
     }
 
     /* adding PID field. as there is no layer 3 being used this set to 0xF0 */
-    
+
     if (type == AX25_I_FRAME || type == AX25_UI_FRAME)
     {
         out[i++] = 0xF0;
@@ -134,6 +134,62 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
 
     return i;
 }
+
+ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint8_t *buffer, const size_t buffer_len)
+{
+    uint8_t bit;
+    uint8_t prev_bit = 0;
+    size_t out_idx = 0;
+    size_t cont_1 = 0;
+    size_t total_cont_1 = 0;
+    size_t i;
+
+    /* Leading FLAG field does not need bit stuffing */
+    memcpy(out, AX25_SYNC_FLAG_MAP_BIN, 8 * sizeof(uint8_t));
+    out_idx = 8;
+
+    /* Skip the leading and trailing FLAG field */
+    buffer++;
+    for (i = 0; i < 8 * (buffer_len - 2); i++)
+    {
+        bit = (buffer[i / 8] >> (i % 8)) & 0x1;
+        out[out_idx++] = bit;
+
+        /* Check if bit stuffing should be applied */
+        if (bit & prev_bit)
+        {
+            cont_1++;
+            total_cont_1++;
+            if (cont_1 == 4)
+            {
+                out[out_idx++] = 0;
+                cont_1 = 0;
+            }
+        }
+        else
+        {
+            cont_1 = total_cont_1 = 0;
+        }
+        prev_bit = bit;
+
+        /*
+         * If the total number of continuous 1's is 15 the the frame should be
+         * dropped
+         */
+        if (total_cont_1 >= 14)
+        {
+            return AX25_ENC_FAIL;
+        }
+    }
+
+    /* Trailing FLAG field does not need bit stuffing */
+    memcpy(out + out_idx, AX25_SYNC_FLAG_MAP_BIN, 8 * sizeof(uint8_t));
+    out_idx += 8;
+
+    *out_len = out_idx;
+    return AX25_ENC_OK;
+}
+
 /**
  * the main function to be called to create ax25 frames
  * @param out is the buffer to hold multiple ax.25 frames
@@ -141,34 +197,56 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
  * @param len length of data to be encoded
  * @param type ax25 frame type (I,S,U,UI frame)
  */
-int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen,ax25_frame_type_t type)
+int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_type_t type)
 {
 
     uint8_t *addr = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_ADDR_LEN);
-    size_t addrlen = ax25_create_addr_field(addr,GRD_CALLSIGN,GRD_SSID,SAT_CALLSIGN,SAT_SSID);
+    size_t addrlen = ax25_create_addr_field(addr, GRD_CALLSIGN, GRD_SSID, SAT_CALLSIGN, SAT_SSID);
 
     uint8_t ctrl;
     size_t ctrllen;
 
+    ax25_encode_status_t status;
+
+    uint8_t interm_buffer[AX25_MAX_FRAME_LEN] = {0};
+    uint8_t tmp_send_buf[AX25_MAX_FRAME_LEN * 8 + AX25_MAX_FRAME_LEN] = {0};
+    uint32_t framelen = 0;
+    size_t ret_len;
+    size_t pad_bits = 0;
+
     /* FUTURE_SHASH_PROBLEMS : 1. create a control field function , 2. add ctrl for other frames */
-    if (type==AX25_UI_FRAME)
+    if (type == AX25_UI_FRAME)
     {
-        ctrl=AX25_CTRL_UI;
-        ctrllen=AX25_MIN_CTRL_LEN;
+        ctrl = AX25_CTRL_UI;
+        ctrllen = AX25_MIN_CTRL_LEN;
     }
 
-    uint8_t interm_buffer[AX25_MAX_FRAME_LEN]={0};
-    uint32_t framelen=0;
-
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
-    framelen= ax25_create_frame(out,in,inlen,type,addr,addrlen,ctrl,ctrllen);
+    framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
+
+    for(int i=0;i<framelen;i++)
+    {
+        printf("\n %x : %c : %d",interm_buffer[i],interm_buffer[i],interm_buffer[i]);
+    }
+
+    status = ax25_bit_stuffing(tmp_send_buf, &ret_len, interm_buffer, framelen);
+    if (status != AX25_ENC_OK)
+    {
+        return -1;
+    }
+
+    memset(out, 0, ret_len / 8 * sizeof(uint8_t));
+  /* Pack now the bits into full bytes */
+  for (int i = 0; i < ret_len; i++)
+  {
+    out[i / 8] |= tmp_send_buf[i] << (7 - (i % 8));
+  }
+  pad_bits = 8 - (ret_len % 8);
+  ret_len += pad_bits;
+  out[ret_len / 8] &= (0xFF << pad_bits);
 
 
-
-    return framelen;
-    
+  return ret_len / 8;
 
     
 }
-
-
