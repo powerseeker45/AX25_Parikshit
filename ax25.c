@@ -1,6 +1,6 @@
 #include "ax25.h"
 #include <stdio.h>
-const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1,1, 1, 1, 1, 0}; 
+const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1, 1, 1, 1, 1, 0};
 
 /**
  * Creates the address field of the AX.25 frame
@@ -224,9 +224,9 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
     framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
 
-    for(int i=0;i<framelen;i++)
+    for (int i = 0; i < framelen; i++)
     {
-        printf("\n %x : %c : %d",interm_buffer[i],interm_buffer[i],interm_buffer[i]);
+        printf("\n %x : %c : %d", interm_buffer[i], interm_buffer[i], interm_buffer[i]);
     }
 
     status = ax25_bit_stuffing(tmp_send_buf, &ret_len, interm_buffer, framelen);
@@ -236,17 +236,140 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
     }
 
     memset(out, 0, ret_len / 8 * sizeof(uint8_t));
-  /* Pack now the bits into full bytes */
-  for (int i = 0; i < ret_len; i++)
-  {
-    out[i / 8] |= tmp_send_buf[i] << (7 - (i % 8));
-  }
-  pad_bits = 8 - (ret_len % 8);
-  ret_len += pad_bits;
-  out[ret_len / 8] &= (0xFF << pad_bits);
+    /* Pack now the bits into full bytes */
+    for (int i = 0; i < ret_len; i++)
+    {
+        out[i / 8] |= tmp_send_buf[i] << (7 - (i % 8));
+    }
+    pad_bits = 8 - (ret_len % 8);
+    ret_len += pad_bits;
+    out[ret_len / 8] &= (0xFF << pad_bits);
 
-
-  return ret_len / 8;
-
-    
+    return ret_len / 8;
 }
+
+ax25_decode_status_t ax25_decode(uint8_t *out, size_t *out_len, const uint8_t *ax25_frame, size_t len)
+{
+    size_t i;
+    size_t frame_start = UINT_MAX;
+    size_t frame_stop = UINT_MAX;
+    uint8_t res;
+    size_t cont_1 = 0;
+    size_t received_bytes = 0;
+    size_t bit_cnt = 0;
+    uint8_t decoded_byte = 0x0;
+    uint16_t fcs;
+    uint16_t recv_fcs;
+
+    /* Start searching for the SYNC flag */
+    for (i = 0; i < len - sizeof(AX25_SYNC_FLAG_MAP_BIN); i++)
+    {
+        res = (AX25_SYNC_FLAG_MAP_BIN[0] ^ ax25_frame[i]) | (AX25_SYNC_FLAG_MAP_BIN[1] ^ ax25_frame[i + 1]) | (AX25_SYNC_FLAG_MAP_BIN[2] ^ ax25_frame[i + 2]) | (AX25_SYNC_FLAG_MAP_BIN[3] ^ ax25_frame[i + 3]) | (AX25_SYNC_FLAG_MAP_BIN[4] ^ ax25_frame[i + 4]) | (AX25_SYNC_FLAG_MAP_BIN[5] ^ ax25_frame[i + 5]) | (AX25_SYNC_FLAG_MAP_BIN[6] ^ ax25_frame[i + 6]) | (AX25_SYNC_FLAG_MAP_BIN[7] ^ ax25_frame[i + 7]);
+        /* Found it! */
+        if (res == 0)
+        {
+            printf("AX Start found at %d\n", i);
+            frame_start = i;
+            break;
+        }
+    }
+
+    /* We failed to find the SYNC flag */
+    if (frame_start == UINT_MAX)
+    {
+        // std::cout << "Frame start was not found" << std::endl;
+        printf("AX Frame start was not found\n");
+        return AX25_DEC_FAIL;
+    }
+
+    for (i = frame_start + sizeof(AX25_SYNC_FLAG_MAP_BIN);
+         i < len - sizeof(AX25_SYNC_FLAG_MAP_BIN) + 1; i++)
+    {
+        /* Check if we reached the frame end */
+        res = (AX25_SYNC_FLAG_MAP_BIN[0] ^ ax25_frame[i]) | (AX25_SYNC_FLAG_MAP_BIN[1] ^ ax25_frame[i + 1]) | (AX25_SYNC_FLAG_MAP_BIN[2] ^ ax25_frame[i + 2]) | (AX25_SYNC_FLAG_MAP_BIN[3] ^ ax25_frame[i + 3]) | (AX25_SYNC_FLAG_MAP_BIN[4] ^ ax25_frame[i + 4]) | (AX25_SYNC_FLAG_MAP_BIN[5] ^ ax25_frame[i + 5]) | (AX25_SYNC_FLAG_MAP_BIN[6] ^ ax25_frame[i + 6]) | (AX25_SYNC_FLAG_MAP_BIN[7] ^ ax25_frame[i + 7]);
+        /* Found it! */
+        if (res == 0)
+        {
+            printf("AX Stop found at %d\n", i);
+            frame_stop = i;
+            break;
+        }
+
+        if (ax25_frame[i])
+        {
+            cont_1++;
+            decoded_byte |= 1 << bit_cnt;
+            bit_cnt++;
+        }
+        else
+        {
+            /* If 5 consecutive 1's drop the extra zero*/
+            if (cont_1 >= 5)
+            {
+                cont_1 = 0;
+            }
+            else
+            {
+                bit_cnt++;
+                cont_1 = 0;
+            }
+        }
+
+        /* Fill the fully constructed byte */
+        if (bit_cnt == 8)
+        {
+            out[received_bytes++] = decoded_byte;
+            bit_cnt = 0;
+            decoded_byte = 0x0;
+        }
+    }
+
+    if (frame_stop == UINT_MAX || received_bytes < AX25_MIN_ADDR_LEN)
+    {
+        printf("AX Wrong frame size\n");
+        return AX25_DEC_FAIL;
+    }
+
+    /* Now check the CRC */
+    fcs = ax25_fcs(out, received_bytes - sizeof(uint16_t));
+    recv_fcs = (((uint16_t)out[received_bytes - 2]) << 8) | out[received_bytes - 1];
+
+    if (fcs != recv_fcs)
+    {
+        printf("AX Wrong FCS\n");
+        return AX25_DEC_FAIL;
+    }
+
+    *out_len = received_bytes - sizeof(uint16_t);
+    return AX25_DEC_OK;
+}
+
+uint32_t ax25_recv(uint8_t *out, const uint8_t *in, size_t len)
+{
+    size_t i;
+    size_t decode_len;
+    ax25_decode_status_t status;
+    uint8_t tmp_recv_buf[AX25_MAX_FRAME_LEN * 8 + AX25_MAX_FRAME_LEN] = {0};
+
+    /* Apply one bit per byte for easy decoding */
+    for (i = 0; i < len; i++)
+    {
+        tmp_recv_buf[8 * i] = (in[i] >> 7) & 0x1;
+        tmp_recv_buf[8 * i + 1] = (in[i] >> 6) & 0x1;
+        tmp_recv_buf[8 * i + 2] = (in[i] >> 5) & 0x1;
+        tmp_recv_buf[8 * i + 3] = (in[i] >> 4) & 0x1;
+        tmp_recv_buf[8 * i + 4] = (in[i] >> 3) & 0x1;
+        tmp_recv_buf[8 * i + 5] = (in[i] >> 2) & 0x1;
+        tmp_recv_buf[8 * i + 6] = (in[i] >> 1) & 0x1;
+        tmp_recv_buf[8 * i + 7] = in[i] & 0x1;
+    }
+
+    /* Perform the actual decoding */
+    status = ax25_decode(out, &decode_len, tmp_recv_buf, len * 8);
+    if (status != AX25_DEC_OK)
+    {
+        return -1;
+    }
+    return (ssize_t)decode_len;
+}
+
