@@ -33,7 +33,7 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
 
     for (i = 0; i < strnlen(src_addr, AX25_MAX_ADDR_LEN); i++)
     {
-        *out++ = dest_addr[i] << 1;
+        *out++ = src_addr[i] << 1;
     }
     for (; i < AX25_CALLSIGN_MAX_LEN; i++)
     {
@@ -199,7 +199,9 @@ ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint
  */
 int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_type_t type)
 {
-
+/**
+ * Future_parikshit_problems : the out buffer is 1d or 2d 
+*/
     uint8_t *addr = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_ADDR_LEN);
     size_t addrlen = ax25_create_addr_field(addr, GRD_CALLSIGN, GRD_SSID, SAT_CALLSIGN, SAT_SSID);
 
