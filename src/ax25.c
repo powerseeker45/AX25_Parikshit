@@ -29,8 +29,7 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
     /* Apply SSID, reserved and C bit */
     /* FIXME: C bit is set to 0 implicitly */
     *out++ = ((0x0F & dest_ssid) << 1) | 0x60;
-    //*out++ = ((0b1111 & dest_ssid) << 1) | 0b01100000;
-
+    
     for (i = 0; i < strnlen(src_addr, AX25_MAX_ADDR_LEN); i++)
     {
         *out++ = src_addr[i] << 1;
@@ -40,11 +39,10 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
         *out++ = ' ' << 1;
     }
     /* Apply SSID, reserved and C bit. As this is the last address field
-     * the trailing bit is set to 1.
+     * the trailing bit is set to 1. as last bit of address.
      */
     /* FIXME: C bit is set to 0 implicitly */
     *out++ = ((0x0F & dest_ssid) << 1) | 0x61;
-    //*out++ = ((0b1111 & dest_ssid) << 1) | 0b01100001;
     return (size_t)AX25_MIN_ADDR_LEN;
 }
 
@@ -90,8 +88,12 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
     /* adding address*/
     if (addr_len == AX25_MIN_ADDR_LEN || addr_len == AX25_MAX_ADDR_LEN)
     {
-        memcpy(out + i, addr, addr_len);
-        i += addr_len;
+        for (int j=0;j<addr_len;j++)
+        {
+            out[i++]=addr[j];
+        }
+        /*memcpy(out + i, addr, addr_len);
+        i += addr_len;*/
     }
     else
     {
@@ -99,10 +101,17 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
     }
 
     /* adding control field */
-    if (ctrl_len == AX25_MIN_CTRL_LEN || ctrl_len == AX25_MAX_CTRL_LEN)
+    if (ctrl_len == AX25_MIN_CTRL_LEN )
     {
-        memcpy(out + i, &ctrl, ctrl_len);
-        i += ctrl_len;
+        out[i++] = (uint8_t)(ctrl & 0xFF);
+    }
+    else if(ctrl_len == AX25_MAX_CTRL_LEN)
+    {
+        
+        out[i++] = (uint8_t)(ctrl & 0xFF);        //lower byte
+        out[i++] = (uint8_t)((ctrl >> 8) & 0xFF);   //upper byte
+        /*memcpy(out + i, &ctrl, ctrl_len);
+        i += ctrl_len;*/
     }
     else
     {
@@ -118,8 +127,12 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
 
     /* addign info into the out buffer */
 
-    memcpy(out + i, info, info_len);
-    i += info_len;
+    /*memcpy(out + i, info, info_len);
+    i += info_len;*/
+    for(int j=0;j<info_len;j++)
+    {
+        out[i++]=info[j];
+    }
 
     /* Compute the FCS. Ignore the first flag byte */
     uint16_t fcs = ax25_fcs(out + 1, i - 1);
@@ -130,7 +143,7 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
     /* final flag */
     out[i++] = AX25_FLAG;
 
-    /**/
+    
 
     return i;
 }
@@ -145,9 +158,14 @@ ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint
     size_t i;
 
     /* Leading FLAG field does not need bit stuffing */
+    for (int j=0;j<8*sizeof(uint8_t);j++)
+    {
+        out[out_idx++]=AX25_SYNC_FLAG_MAP_BIN[j];
+    }
+    /*
     memcpy(out, AX25_SYNC_FLAG_MAP_BIN, 8 * sizeof(uint8_t));
     out_idx = 8;
-
+    */
     /* Skip the leading and trailing FLAG field */
     buffer++;
     for (i = 0; i < 8 * (buffer_len - 2); i++)
@@ -183,8 +201,13 @@ ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint
     }
 
     /* Trailing FLAG field does not need bit stuffing */
+    for (int j=0;j<8*sizeof(uint8_t);j++)
+    {
+        out[out_idx++]=AX25_SYNC_FLAG_MAP_BIN[j];
+    }
+    /*
     memcpy(out + out_idx, AX25_SYNC_FLAG_MAP_BIN, 8 * sizeof(uint8_t));
-    out_idx += 8;
+    out_idx += 8;*/
 
     *out_len = out_idx;
     return AX25_ENC_OK;
