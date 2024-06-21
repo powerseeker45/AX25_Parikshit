@@ -236,7 +236,7 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
     uint8_t interm_buffer[AX25_MAX_FRAME_LEN] = {0};
     uint8_t tmp_send_buf[AX25_MAX_FRAME_LEN * 8 + AX25_MAX_FRAME_LEN] = {0};
     uint32_t framelen = 0;
-    size_t ret_len;
+    size_t temp_len;
     size_t pad_bits = 0;
 
     /* FUTURE_SHASH_PROBLEMS : 1. create a control field function , 2. add ctrl for other frames */
@@ -248,29 +248,30 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
 
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
     framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
-
+/**
+ * TESTING 
     for (int i = 0; i < framelen; i++)
     {
         printf("\n %x : %c : %d", interm_buffer[i], interm_buffer[i], interm_buffer[i]);
     }
-
-    status = ax25_bit_stuffing(tmp_send_buf, &ret_len, interm_buffer, framelen);
+*/
+    status = ax25_bit_stuffing(tmp_send_buf, &temp_len, interm_buffer, framelen);
     if (status != AX25_ENC_OK)
     {
         return -1;
     }
 
-    memset(out, 0, ret_len / 8 * sizeof(uint8_t));
+    memset(out, 0, temp_len / 8 * sizeof(uint8_t));
     /* Pack now the bits into full bytes */
-    for (int i = 0; i < ret_len; i++)
+    for (int i = 0; i < temp_len; i++)
     {
         out[i / 8] |= tmp_send_buf[i] << (7 - (i % 8));
     }
-    pad_bits = 8 - (ret_len % 8);
-    ret_len += pad_bits;
-    out[ret_len / 8] &= (0xFF << pad_bits);
+    pad_bits = 8 - (temp_len % 8);
+    temp_len += pad_bits;
+    out[temp_len / 8] &= (0xFF << pad_bits);
 
-    return ret_len / 8;
+    return temp_len / 8;
 }
 
 ax25_decode_status_t ax25_decode(uint8_t *out, size_t *out_len, const uint8_t *ax25_frame, size_t len)
