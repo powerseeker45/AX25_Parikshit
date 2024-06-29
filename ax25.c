@@ -2,6 +2,8 @@
 #include <stdio.h>
 const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1, 1, 1, 1, 1, 0};
 
+/*FUTURE_SHASH_PROBLEMS: add error codes for errors that can occur*/
+
 /**
  * Creates the address field of the AX.25 frame
  * @param out the output buffer with enough memory to hold the address field
@@ -249,12 +251,12 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
     framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
 /**
- * TESTING 
+ * TESTING */
     for (int i = 0; i < framelen; i++)
     {
         printf("\n %x : %c : %d", interm_buffer[i], interm_buffer[i], interm_buffer[i]);
     }
-*/
+
     status = ax25_bit_stuffing(tmp_send_buf, &temp_len, interm_buffer, framelen);
     if (status != AX25_ENC_OK)
     {
