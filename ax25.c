@@ -20,13 +20,14 @@ ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
 {
 
     uint16_t i = 0;
+    uint16_t j =0;
 
     if (out==NULL)
         return AX25_ENC_ADDR_FAIL;
 
-    for (i = 0; i < strnlen(SAT_CALLSIGN, AX25_MAX_ADDR_LEN); i++)
+    for (i = 0; i < strnlen(SAT_CALLSIGN, AX25_CALLSIGN_MAX_LEN); i++)
     {
-        *out++ = SAT_CALLSIGN[i] << 1;
+        out[j++] = SAT_CALLSIGN[i] << 1;
     }
     /*
      * Perhaps the destination callsign was smaller that the maximum allowed.
@@ -34,29 +35,56 @@ ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
      */
     for (; i < AX25_CALLSIGN_MAX_LEN; i++)
     {
-        *out++ = ' ' << 1;
+        out[j++] = ' ' << 1;
     }
     /* Apply SSID, reserved and C bit */
     /* FIXME: C bit is set to 0 implicitly */
-    *out++ = ((0x0F & SAT_SSID) << 1) | 0x60;
+    out[j++] = ((0x0F & SAT_SSID) << 1) | 0x60;
     
-    for (i = 0; i < strnlen(GRD_CALLSIGN, AX25_MAX_ADDR_LEN); i++)
+    for (i = 0; i < strnlen(GRD_CALLSIGN, AX25_CALLSIGN_MAX_LEN); i++)
     {
-        *out++ = GRD_CALLSIGN[i] << 1;
+        out[j++] = GRD_CALLSIGN[i] << 1;
     }
     for (; i < AX25_CALLSIGN_MAX_LEN; i++)
     {
-        *out++ = ' ' << 1;
+        out[j++] = ' ' << 1;
     }
     /* Apply SSID, reserved and C bit. As this is the last address field
      * the trailing bit is set to 1. as last bit of address.
      */
     /* FIXME: C bit is set to 0 implicitly */
-    *out++ = ((0x0F & GRD_SSID) << 1) | 0x61;
+    out[j++] = ((0x0F & GRD_SSID) << 1) | 0x61;
+
+
+    if (j!=AX25_MAX_ADDR_LEN|| j!=AX25_MIN_ADDR_LEN)
+        return AX25_ENC_ADDR_FAIL;
 
 
     return AX25_ENC_OK;
 }
+
+ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out,uint8_t *ctrl)
+{
+    uint8_t i=0;
+    size_t ctrl_len= strnlen(ctrl,ax)
+    if (ctrl_len!=AX25_MIN_CTRL_LEN)
+    if (ctrl_len == AX25_MIN_CTRL_LEN )
+    {
+        out[i++] = (uint8_t)(ctrl & 0xFF);
+    }
+    else if(ctrl_len == AX25_MAX_CTRL_LEN)
+    {
+
+        out[i++] = (uint8_t)(ctrl & 0xFF);        //lower byte
+        out[i++] = (uint8_t)((ctrl >> 8) & 0xFF);   //upper byte
+
+    }
+    else
+    {
+        return AX25_ENC_CTRL_FAIL;
+    }
+}
+
 
 /**
  * Calculates the FCS of the AX25 frame
@@ -91,15 +119,16 @@ ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs)
  * @param ctrl control field
  * @param ctrl_len lenght of ctrl field
  */
-size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t ctrl, size_t ctrl_len)
+ax25_encode_status_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t *addr, size_t addr_len)
 {   
     // returns if info length passed is greater than allowed frame size
-    if (info_len > AX25_MAX_FRAME_LEN)
+    if (info_len > AX25_MAX_FRAME_LEN||addr_len == AX25_MIN_ADDR_LEN || addr_len == AX25_MAX_ADDR_LEN)
     {
-        return 0;
+        return AX25_ENC_FAIL;
     }
 
     uint16_t i = 0; // index for out pointer
+    uint16_t j=0;
     ax25_encode_status_t status=AX25_ENC_OK;
     uint16_t fcs=0xFFFF;
 
@@ -109,29 +138,20 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uin
 
     /* adding address*/
     
-    status=ax25_create_addr_field((out+i));
-    i++;
+    for (j=0;j<strnlen(addr,AX25_MAX_ADDR_LEN);j++)
+    {
+        out[i++]=addr[j];
+    }
+   
+     /* adding control field */
+     /* FUTURE_SHASH_PROBLEMS : 1. create a control field function , 2. add ctrl for other frames */
+    
+        out[i++] = (AX25_CTRL_UI & 0xFF);
 
-    if (status!=AX25_ENC_OK)
-        return status;
     
 
-    /* adding control field */
-    if (ctrl_len == AX25_MIN_CTRL_LEN )
-    {
-        out[i++] = (uint8_t)(ctrl & 0xFF);
-    }
-    else if(ctrl_len == AX25_MAX_CTRL_LEN)
-    {
-
-        out[i++] = (uint8_t)(ctrl & 0xFF);        //lower byte
-        out[i++] = (uint8_t)((ctrl >> 8) & 0xFF);   //upper byte
-
-    }
-    else
-    {
-        return AX25_ENC_CTRL_FAIL;
-    }
+    
+    
 
     /* adding PID field. As there is no layer 3 being used this set to 0xF0 */
     out[i++] = 0xF0;
@@ -233,13 +253,16 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
 /**
  * Future_parikshit_problems : the out buffer is 1d or 2d 
 */
+    ax25_encode_status_t status=AX25_ENC_OK;
+
+
     uint8_t *addr = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_ADDR_LEN);
-    size_t addrlen = ax25_create_addr_field(addr, GRD_CALLSIGN, GRD_SSID, SAT_CALLSIGN, SAT_SSID);
+    uint8_t *ctrl = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_CTRL_LEN);
 
-    uint8_t ctrl;
-    size_t ctrllen;
+    status = ax25_create_addr_field(addr,);
+    if (status!=AX25_ENC_OK)
+        return status;
 
-    ax25_encode_status_t status;
 
     uint8_t interm_buffer[AX25_MAX_FRAME_LEN] = {0};
     uint8_t tmp_send_buf[AX25_MAX_FRAME_LEN * 8 + AX25_MAX_FRAME_LEN] = {0};
@@ -247,22 +270,18 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
     size_t temp_len;
     size_t pad_bits = 0;
 
-    /* FUTURE_SHASH_PROBLEMS : 1. create a control field function , 2. add ctrl for other frames */
-    if (type == AX25_UI_FRAME)
-    {
-        ctrl = AX25_CTRL_UI;
-        ctrllen = AX25_MIN_CTRL_LEN;
-    }
+   
 
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
     framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
 /**
  * TESTING */
+/*
     for (int i = 0; i < framelen; i++)
     {
         printf("\n %x : %c : %d", interm_buffer[i], interm_buffer[i], interm_buffer[i]);
     }
-
+*/
     status = ax25_bit_stuffing(tmp_send_buf, &temp_len, interm_buffer, framelen);
     if (status != AX25_ENC_OK)
     {

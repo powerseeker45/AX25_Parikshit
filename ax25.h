@@ -49,15 +49,20 @@ typedef enum
 
 static const uint8_t AX25_CTRL_UI= 0x03;
 
+typedef enum
+{
+  AX25_ENC_ADDR_FAIL, AX25_ENC_CTRL_FAIL,AX25_ENC_FCS_FAIL,AX25_ENC_FAIL, AX25_ENC_OK
+}ax25_encode_status_t;
+
 /**
  * bit stuffing status
-*/
+
 typedef enum
 {
   AX25_ENC_FAIL, AX25_ENC_OK
 } ax25_encode_status_t;
 
-
+*/
 typedef enum
 {
   AX25_DEC_FAIL, AX25_DEC_OK
