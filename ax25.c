@@ -12,13 +12,21 @@ const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1, 1, 1, 1, 1, 0};
  * @param src_addr the callsign of the source
  * @param src_ssid the source SSID
  */
-size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t dest_ssid, const uint8_t *src_addr, uint8_t src_ssid)
+
+/**
+ * DOC: for ground station put grd address first then sat 
+ */
+ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
 {
+
     uint16_t i = 0;
 
-    for (i = 0; i < strnlen(dest_addr, AX25_MAX_ADDR_LEN); i++)
+    if (out==NULL)
+        return AX25_ENC_ADDR_FAIL;
+
+    for (i = 0; i < strnlen(SAT_CALLSIGN, AX25_MAX_ADDR_LEN); i++)
     {
-        *out++ = dest_addr[i] << 1;
+        *out++ = SAT_CALLSIGN[i] << 1;
     }
     /*
      * Perhaps the destination callsign was smaller that the maximum allowed.
@@ -30,11 +38,11 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
     }
     /* Apply SSID, reserved and C bit */
     /* FIXME: C bit is set to 0 implicitly */
-    *out++ = ((0x0F & dest_ssid) << 1) | 0x60;
+    *out++ = ((0x0F & SAT_SSID) << 1) | 0x60;
     
-    for (i = 0; i < strnlen(src_addr, AX25_MAX_ADDR_LEN); i++)
+    for (i = 0; i < strnlen(GRD_CALLSIGN, AX25_MAX_ADDR_LEN); i++)
     {
-        *out++ = src_addr[i] << 1;
+        *out++ = GRD_CALLSIGN[i] << 1;
     }
     for (; i < AX25_CALLSIGN_MAX_LEN; i++)
     {
@@ -44,8 +52,10 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
      * the trailing bit is set to 1. as last bit of address.
      */
     /* FIXME: C bit is set to 0 implicitly */
-    *out++ = ((0x0F & dest_ssid) << 1) | 0x61;
-    return (size_t)AX25_MIN_ADDR_LEN;
+    *out++ = ((0x0F & GRD_SSID) << 1) | 0x61;
+
+
+    return AX25_ENC_OK;
 }
 
 /**
@@ -54,14 +64,20 @@ size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t de
  * @param len size of the buffer
  * @return the FCS of the buffer
  */
-uint16_t ax25_fcs(uint8_t *buffer, size_t len)
+ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs)
 {
-    uint16_t fcs = 0xFFFF;
+    fcs = 0xFFFF;
+    if (len<=0||len>AX25_MAX_FRAME_LEN)
+    {
+        return AX25_ENC_FAIL;
+    }
     while (len--)
     {
         fcs = (fcs >> 8) ^ crc16_ccitt_table_reverse[(fcs ^ *buffer++) & 0xFF];
     }
-    return fcs ^ 0xFFFF;
+    fcs=fcs ^ 0xFFFF;
+    return AX25_ENC_OK;
+
 }
 
 /**
@@ -75,32 +91,30 @@ uint16_t ax25_fcs(uint8_t *buffer, size_t len)
  * @param ctrl control field
  * @param ctrl_len lenght of ctrl field
  */
-size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax25_frame_type_t type, uint8_t *addr, size_t addr_len, uint16_t ctrl, size_t ctrl_len)
-{
+size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t ctrl, size_t ctrl_len)
+{   
     // returns if info length passed is greater than allowed frame size
     if (info_len > AX25_MAX_FRAME_LEN)
     {
         return 0;
     }
 
-    uint16_t i = 1; // index for out pointer
+    uint16_t i = 0; // index for out pointer
+    ax25_encode_status_t status=AX25_ENC_OK;
+    uint16_t fcs=0xFFFF;
 
     /* adding initial flag*/
-    out[0] = AX25_FLAG;
+    out[i++] = AX25_FLAG;
+
+
     /* adding address*/
-    if (addr_len == AX25_MIN_ADDR_LEN || addr_len == AX25_MAX_ADDR_LEN)
-    {
-        for (int j=0;j<addr_len;j++)
-        {
-            out[i++]=addr[j];
-        }
-        /*memcpy(out + i, addr, addr_len);
-        i += addr_len;*/
-    }
-    else
-    {
-        return 0;
-    }
+    
+    status=ax25_create_addr_field((out+i));
+    i++;
+
+    if (status!=AX25_ENC_OK)
+        return status;
+    
 
     /* adding control field */
     if (ctrl_len == AX25_MIN_CTRL_LEN )
@@ -109,35 +123,27 @@ size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax2
     }
     else if(ctrl_len == AX25_MAX_CTRL_LEN)
     {
-        
+
         out[i++] = (uint8_t)(ctrl & 0xFF);        //lower byte
         out[i++] = (uint8_t)((ctrl >> 8) & 0xFF);   //upper byte
-        /*memcpy(out + i, &ctrl, ctrl_len);
-        i += ctrl_len;*/
+
     }
     else
     {
-        return 0;
+        return AX25_ENC_CTRL_FAIL;
     }
 
-    /* adding PID field. as there is no layer 3 being used this set to 0xF0 */
+    /* adding PID field. As there is no layer 3 being used this set to 0xF0 */
+    out[i++] = 0xF0;
 
-    if (type == AX25_I_FRAME || type == AX25_UI_FRAME)
-    {
-        out[i++] = 0xF0;
-    }
-
-    /* addign info into the out buffer */
-
-    /*memcpy(out + i, info, info_len);
-    i += info_len;*/
+    /* adding info into the out buffer */
     for(int j=0;j<info_len;j++)
     {
         out[i++]=info[j];
     }
 
     /* Compute the FCS. Ignore the first flag byte */
-    uint16_t fcs = ax25_fcs(out + 1, i - 1);
+    status = ax25_fcs(out + 1, i - 1,fcs);
     /* The MS bits are sent first ONLY at the FCS field */
     out[i++] = (fcs >> 8) & 0xFF;
     out[i++] = fcs & 0xFF;
