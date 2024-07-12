@@ -63,26 +63,27 @@ ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
     return AX25_ENC_OK;
 }
 
-ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out,uint8_t *ctrl)
+ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out,uint8_t *ctrl_type)
 {
     uint8_t i=0;
-    size_t ctrl_len= strnlen(ctrl,ax)
+    size_t ctrl_len= strnlen(ctrl_type,AX25_MAX_CTRL_LEN);
     if (ctrl_len!=AX25_MIN_CTRL_LEN)
     if (ctrl_len == AX25_MIN_CTRL_LEN )
     {
-        out[i++] = (uint8_t)(ctrl & 0xFF);
+        out[i++] = (uint8_t)(*ctrl_type & 0xFF);
     }
     else if(ctrl_len == AX25_MAX_CTRL_LEN)
     {
 
-        out[i++] = (uint8_t)(ctrl & 0xFF);        //lower byte
-        out[i++] = (uint8_t)((ctrl >> 8) & 0xFF);   //upper byte
+        out[i++] = (uint8_t)(*ctrl_type & 0xFF);        //lower byte
+        out[i++] = (uint8_t)((*ctrl_type >> 8) & 0xFF);   //upper byte
 
     }
     else
     {
         return AX25_ENC_CTRL_FAIL;
     }
+    return AX25_ENC_OK;
 }
 
 
@@ -119,7 +120,7 @@ ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs)
  * @param ctrl control field
  * @param ctrl_len lenght of ctrl field
  */
-ax25_encode_status_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t *addr, size_t addr_len)
+ax25_encode_status_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t *addr, uint8_t *ctrl)
 {   
     // returns if info length passed is greater than allowed frame size
     if (info_len > AX25_MAX_FRAME_LEN||addr_len == AX25_MIN_ADDR_LEN || addr_len == AX25_MAX_ADDR_LEN)
@@ -254,26 +255,34 @@ int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_ty
  * Future_parikshit_problems : the out buffer is 1d or 2d 
 */
     ax25_encode_status_t status=AX25_ENC_OK;
-
-
-    uint8_t *addr = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_ADDR_LEN);
-    uint8_t *ctrl = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_CTRL_LEN);
-
-    status = ax25_create_addr_field(addr,);
-    if (status!=AX25_ENC_OK)
-        return status;
-
-
     uint8_t interm_buffer[AX25_MAX_FRAME_LEN] = {0};
     uint8_t tmp_send_buf[AX25_MAX_FRAME_LEN * 8 + AX25_MAX_FRAME_LEN] = {0};
     uint32_t framelen = 0;
     size_t temp_len;
     size_t pad_bits = 0;
 
+
+    uint8_t *addr = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_ADDR_LEN);
+    uint8_t *ctrl = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_CTRL_LEN);
+
+    status = ax25_create_addr_field(addr);
+    if (status!=AX25_ENC_OK)
+        return status;
+
+    /*can add a switch case to add functionality for is other ctrl field is to be used*/
+    if (type==AX25_UI_FRAME)
+        status=ax25_create_ctrl_field(ctrl,AX25_CTRL_UI);
+        
+    if (status!=AX25_ENC_OK)
+        return status;
+
+
+    
+
    
 
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
-    framelen = ax25_create_frame(interm_buffer, in, inlen, type, addr, addrlen, ctrl, ctrllen);
+    framelen = ax25_create_frame(interm_buffer, in, inlen, addr, ctrl);
 /**
  * TESTING */
 /*
