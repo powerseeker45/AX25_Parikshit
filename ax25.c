@@ -2,7 +2,9 @@
 #include <stdio.h>
 const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1, 1, 1, 1, 1, 0};
 
-/*FUTURE_SHASH_PROBLEMS: add error codes for errors that can occur*/
+/**
+ * FIXME: encode_status_t enum giving error as return type
+ */
 
 /**
  * Creates the address field of the AX.25 frame
@@ -301,6 +303,7 @@ ax25_decode_status_t ax25_decode(uint8_t *out, size_t *out_len, const uint8_t *a
     uint8_t decoded_byte = 0x0;
     uint16_t fcs;
     uint16_t recv_fcs;
+    ax25_decode_status_t status;
 
     /* Start searching for the SYNC flag */
     for (i = 0; i < len - sizeof(AX25_SYNC_FLAG_MAP_BIN); i++)
@@ -372,7 +375,7 @@ ax25_decode_status_t ax25_decode(uint8_t *out, size_t *out_len, const uint8_t *a
     }
 
     /* Now check the CRC */
-    fcs = ax25_fcs(out, received_bytes - sizeof(uint16_t));
+    status = ax25_fcs(out, received_bytes - sizeof(uint16_t),fcs);
     recv_fcs = (((uint16_t)out[received_bytes - 2]) << 8) | out[received_bytes - 1];
 
     if (fcs != recv_fcs)
@@ -412,4 +415,20 @@ uint32_t ax25_recv(uint8_t *out, const uint8_t *in, size_t len)
         return -1;
     }
     return (ssize_t)decode_len;
+}
+
+
+
+int main()
+{
+    uint8_t * add_test= (uint8_t *) malloc(AX25_MAX_ADDR_LEN);
+
+    ax25_encode_status_t status= ax25_create_addr_field(add_test);
+
+    printf("\nstatus = %d\n",status);
+
+   
+
+    return 0;
+    
 }
