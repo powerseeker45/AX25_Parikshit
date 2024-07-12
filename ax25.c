@@ -14,15 +14,15 @@ const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1, 1, 1, 1, 1, 0};
  */
 
 /**
- * DOC: for ground station put grd address first then sat 
+ * DOC: for ground station put grd address first then sat
  */
 ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
 {
 
     uint16_t i = 0;
-    uint16_t j =0;
+    uint16_t j = 0;
 
-    if (out==NULL)
+    if (out == NULL)
         return AX25_ENC_ADDR_FAIL;
 
     for (i = 0; i < strnlen(SAT_CALLSIGN, AX25_CALLSIGN_MAX_LEN); i++)
@@ -40,7 +40,7 @@ ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
     /* Apply SSID, reserved and C bit */
     /* FIXME: C bit is set to 0 implicitly */
     out[j++] = ((0x0F & SAT_SSID) << 1) | 0x60;
-    
+
     for (i = 0; i < strnlen(GRD_CALLSIGN, AX25_CALLSIGN_MAX_LEN); i++)
     {
         out[j++] = GRD_CALLSIGN[i] << 1;
@@ -55,37 +55,33 @@ ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
     /* FIXME: C bit is set to 0 implicitly */
     out[j++] = ((0x0F & GRD_SSID) << 1) | 0x61;
 
-
-    if (j!=AX25_MAX_ADDR_LEN|| j!=AX25_MIN_ADDR_LEN)
+    if (j != AX25_MAX_ADDR_LEN || j != AX25_MIN_ADDR_LEN)
         return AX25_ENC_ADDR_FAIL;
 
-
     return AX25_ENC_OK;
 }
 
-ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out,uint8_t *ctrl_type)
+ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out, uint8_t *ctrl_type)
 {
-    uint8_t i=0;
-    size_t ctrl_len= strnlen(ctrl_type,AX25_MAX_CTRL_LEN);
-    if (ctrl_len!=AX25_MIN_CTRL_LEN)
-    if (ctrl_len == AX25_MIN_CTRL_LEN )
-    {
-        out[i++] = (uint8_t)(*ctrl_type & 0xFF);
-    }
-    else if(ctrl_len == AX25_MAX_CTRL_LEN)
-    {
+    uint8_t i = 0;
+    size_t ctrl_len = strnlen(ctrl_type, AX25_MAX_CTRL_LEN);
+    if (ctrl_len != AX25_MIN_CTRL_LEN)
+        if (ctrl_len == AX25_MIN_CTRL_LEN)
+        {
+            out[i++] = (uint8_t)(*ctrl_type & 0xFF);
+        }
+        else if (ctrl_len == AX25_MAX_CTRL_LEN)
+        {
 
-        out[i++] = (uint8_t)(*ctrl_type & 0xFF);        //lower byte
-        out[i++] = (uint8_t)((*ctrl_type >> 8) & 0xFF);   //upper byte
-
-    }
-    else
-    {
-        return AX25_ENC_CTRL_FAIL;
-    }
+            out[i++] = (uint8_t)(*ctrl_type & 0xFF);        // lower byte
+            out[i++] = (uint8_t)((*ctrl_type >> 8) & 0xFF); // upper byte
+        }
+        else
+        {
+            return AX25_ENC_CTRL_FAIL;
+        }
     return AX25_ENC_OK;
 }
-
 
 /**
  * Calculates the FCS of the AX25 frame
@@ -96,7 +92,7 @@ ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out,uint8_t *ctrl_type)
 ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs)
 {
     fcs = 0xFFFF;
-    if (len<=0||len>AX25_MAX_FRAME_LEN)
+    if (len <= 0 || len > AX25_MAX_FRAME_LEN)
     {
         return AX25_ENC_FAIL;
     }
@@ -104,9 +100,8 @@ ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs)
     {
         fcs = (fcs >> 8) ^ crc16_ccitt_table_reverse[(fcs ^ *buffer++) & 0xFF];
     }
-    fcs=fcs ^ 0xFFFF;
+    fcs = fcs ^ 0xFFFF;
     return AX25_ENC_OK;
-
 }
 
 /**
@@ -121,58 +116,48 @@ ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs)
  * @param ctrl_len lenght of ctrl field
  */
 ax25_encode_status_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t *addr, uint8_t *ctrl)
-{   
+{
     // returns if info length passed is greater than allowed frame size
-    if (info_len > AX25_MAX_FRAME_LEN||addr_len == AX25_MIN_ADDR_LEN || addr_len == AX25_MAX_ADDR_LEN)
+    if (info_len > AX25_MAX_FRAME_LEN || addr == NULL || ctrl == NULL)
     {
         return AX25_ENC_FAIL;
     }
 
     uint16_t i = 0; // index for out pointer
-    uint16_t j=0;
-    ax25_encode_status_t status=AX25_ENC_OK;
-    uint16_t fcs=0xFFFF;
+    uint16_t j = 0;
+    ax25_encode_status_t status = AX25_ENC_OK;
+    uint16_t fcs = 0xFFFF;
 
     /* adding initial flag*/
     out[i++] = AX25_FLAG;
 
-
     /* adding address*/
-    
-    for (j=0;j<strnlen(addr,AX25_MAX_ADDR_LEN);j++)
+
+    for (j = 0; j < strnlen(addr, AX25_MAX_ADDR_LEN); j++)
     {
-        out[i++]=addr[j];
+        out[i++] = addr[j];
     }
-   
-     /* adding control field */
-     /* FUTURE_SHASH_PROBLEMS : 1. create a control field function , 2. add ctrl for other frames */
-    
-        out[i++] = (AX25_CTRL_UI & 0xFF);
 
-    
+    /* adding control field */
+    out[i++] = (AX25_CTRL_UI & 0xFF);
 
-    
-    
-
-    /* adding PID field. As there is no layer 3 being used this set to 0xF0 */
-    out[i++] = 0xF0;
+    /* adding PID field */
+    out[i++] = AX25_PID_NOLAYER;
 
     /* adding info into the out buffer */
-    for(int j=0;j<info_len;j++)
+    for (j = 0; j < info_len; j++)
     {
-        out[i++]=info[j];
+        out[i++] = info[j];
     }
 
     /* Compute the FCS. Ignore the first flag byte */
-    status = ax25_fcs(out + 1, i - 1,fcs);
+    status = ax25_fcs(out + 1, i - 1, fcs);
     /* The MS bits are sent first ONLY at the FCS field */
     out[i++] = (fcs >> 8) & 0xFF;
     out[i++] = fcs & 0xFF;
 
     /* final flag */
     out[i++] = AX25_FLAG;
-
-    
 
     return i;
 }
@@ -187,9 +172,9 @@ ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint
     size_t i;
 
     /* Leading FLAG field does not need bit stuffing */
-    for (int j=0;j<8*sizeof(uint8_t);j++)
+    for (int j = 0; j < 8 * sizeof(uint8_t); j++)
     {
-        out[out_idx++]=AX25_SYNC_FLAG_MAP_BIN[j];
+        out[out_idx++] = AX25_SYNC_FLAG_MAP_BIN[j];
     }
     /*
     memcpy(out, AX25_SYNC_FLAG_MAP_BIN, 8 * sizeof(uint8_t));
@@ -230,9 +215,9 @@ ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint
     }
 
     /* Trailing FLAG field does not need bit stuffing */
-    for (int j=0;j<8*sizeof(uint8_t);j++)
+    for (int j = 0; j < 8 * sizeof(uint8_t); j++)
     {
-        out[out_idx++]=AX25_SYNC_FLAG_MAP_BIN[j];
+        out[out_idx++] = AX25_SYNC_FLAG_MAP_BIN[j];
     }
     /*
     memcpy(out + out_idx, AX25_SYNC_FLAG_MAP_BIN, 8 * sizeof(uint8_t));
@@ -251,46 +236,40 @@ ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint
  */
 int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_type_t type)
 {
-/**
- * Future_parikshit_problems : the out buffer is 1d or 2d 
-*/
-    ax25_encode_status_t status=AX25_ENC_OK;
+    /**
+     * Future_parikshit_problems : the out buffer is 1d or 2d
+     */
+    ax25_encode_status_t status = AX25_ENC_OK;
     uint8_t interm_buffer[AX25_MAX_FRAME_LEN] = {0};
     uint8_t tmp_send_buf[AX25_MAX_FRAME_LEN * 8 + AX25_MAX_FRAME_LEN] = {0};
     uint32_t framelen = 0;
     size_t temp_len;
     size_t pad_bits = 0;
 
-
     uint8_t *addr = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_ADDR_LEN);
     uint8_t *ctrl = (uint8_t *)malloc(sizeof(uint8_t) * AX25_MAX_CTRL_LEN);
 
     status = ax25_create_addr_field(addr);
-    if (status!=AX25_ENC_OK)
+    if (status != AX25_ENC_OK)
         return status;
 
     /*can add a switch case to add functionality for is other ctrl field is to be used*/
-    if (type==AX25_UI_FRAME)
-        status=ax25_create_ctrl_field(ctrl,AX25_CTRL_UI);
-        
-    if (status!=AX25_ENC_OK)
+    if (type == AX25_UI_FRAME)
+        status = ax25_create_ctrl_field(ctrl, AX25_CTRL_UI);
+
+    if (status != AX25_ENC_OK)
         return status;
-
-
-    
-
-   
 
     /*immidiate_shash_update: add as to make multiple, use interm buffer */
     framelen = ax25_create_frame(interm_buffer, in, inlen, addr, ctrl);
-/**
- * TESTING */
-/*
-    for (int i = 0; i < framelen; i++)
-    {
-        printf("\n %x : %c : %d", interm_buffer[i], interm_buffer[i], interm_buffer[i]);
-    }
-*/
+    /**
+     * TESTING */
+    /*
+        for (int i = 0; i < framelen; i++)
+        {
+            printf("\n %x : %c : %d", interm_buffer[i], interm_buffer[i], interm_buffer[i]);
+        }
+    */
     status = ax25_bit_stuffing(tmp_send_buf, &temp_len, interm_buffer, framelen);
     if (status != AX25_ENC_OK)
     {
@@ -434,4 +413,3 @@ uint32_t ax25_recv(uint8_t *out, const uint8_t *in, size_t len)
     }
     return (ssize_t)decode_len;
 }
-
