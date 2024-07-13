@@ -18,7 +18,7 @@ const uint8_t AX25_SYNC_FLAG_MAP_BIN[8] = {0, 1, 1, 1, 1, 1, 1, 0};
 /**
  * DOC: for ground station put grd address first then sat
  */
-ax25_encode_status_t ax25_create_addr_field(uint8_t *out)
+ax25_encode_status_t ax25_create_addr_field(uint8_t* out)
 {
 
     uint16_t i = 0;

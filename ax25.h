@@ -53,9 +53,9 @@ static const uint8_t AX25_CTRL_UI = 0x03;
 
 static const uint8_t AX25_PID_NOLAYER= 0xF0;
 
-typedef enum
+typedef enum ax25_encode_status_t
 {
-  AX25_ENC_ADDR_FAIL=-54,
+  AX25_ENC_ADDR_FAIL,
   AX25_ENC_CTRL_FAIL,
   AX25_ENC_FCS_FAIL,
   AX25_ENC_FAIL,
@@ -71,17 +71,21 @@ typedef enum
 /**
  * function definitions
  */
+ax25_encode_status_t ax25_create_addr_field(uint8_t* out);
 
-size_t ax25_create_addr_field(uint8_t *out, const uint8_t *dest_addr, uint8_t dest_ssid, const uint8_t *src_addr, uint8_t src_ssid);
+ax25_encode_status_t ax25_create_ctrl_field(uint8_t *out, uint8_t *ctrl_type);
 
-uint16_t ax25_fcs(uint8_t *buffer, size_t len);
+ax25_encode_status_t ax25_fcs(uint8_t *buffer, size_t len, uint16_t fcs);
 
-size_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, ax25_frame_type_t type, uint8_t *addr, size_t addr_len, uint16_t ctrl, size_t ctrl_len);
+ax25_encode_status_t ax25_create_frame(uint8_t *out, const uint8_t *info, size_t info_len, uint16_t *addr, uint8_t *ctrl);
+
+ax25_encode_status_t ax25_bit_stuffing(uint8_t *out, size_t *out_len, const uint8_t *buffer, const size_t buffer_len);
 
 int32_t ax25_encode(uint8_t *out, const uint8_t *in, size_t inlen, ax25_frame_type_t type);
 
+ax25_decode_status_t ax25_decode(uint8_t *out, size_t *out_len, const uint8_t *ax25_frame, size_t len);
+
 uint32_t ax25_recv(uint8_t *out, const uint8_t *in, size_t len);
 
-ax25_decode_status_t ax25_decode(uint8_t *out, size_t *out_len, const uint8_t *ax25_frame, size_t len);
 
 #endif /* AX25_H */
