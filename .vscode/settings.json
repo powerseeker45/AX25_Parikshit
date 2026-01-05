@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "stdint-gcc.h": "c",
-        "stdint.h": "c",
-        "cstdint": "c",
-        "ax25.h": "c",
-        "stdio.h": "c"
-    }
-}
